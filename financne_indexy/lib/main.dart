@@ -799,7 +799,7 @@ class _CombinedChartViewState extends State<CombinedChartView> {
                         ),
                         lineTouchData: LineTouchData(
                           touchTooltipData: LineTouchTooltipData(
-                            getTooltipColor: (_) => Colors.blueGrey.shade900,
+                            getTooltipColor: (_) => Colors.white,
                             fitInsideHorizontally: true,
                             fitInsideVertically: true,
                             getTooltipItems: (touchedSpots) {
@@ -894,7 +894,7 @@ class _CombinedChartViewState extends State<CombinedChartView> {
                         ),
                         borderData: FlBorderData(show: true, border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.3)), left: BorderSide(color: Colors.grey.withOpacity(0.3)))),
                         lineTouchData: LineTouchData(touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (_) => Colors.blueGrey.shade900,
+                          getTooltipColor: (_) => Colors.white,
                           getTooltipItems: (spots) => spots.map((s) {
                             if (s.barIndex < 2) return null;
                             final idx = activeRsi[s.barIndex - 2];
