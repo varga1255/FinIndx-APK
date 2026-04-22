@@ -379,106 +379,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Expanded(
             child: ListView(
-              children: regionOrder.map((region) {
-                final indices = grouped[region]!;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Hlavička regiónu
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                      child: Text(
-                        region,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1565C0),
-                          letterSpacing: 0.5,
+              children: [
+                ...regionOrder.map((region) {
+                  final indices = grouped[region]!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Hlavička regiónu
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Text(
+                          region,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1565C0),
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ),
-                    // Indexy v regióne
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)
-                        ],
-                      ),
-                      child: Column(
-                        children: indices.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final idx = entry.value;
-                          final isSelected = _selected.contains(idx.ticker);
-                          return Column(
-                            children: [
-                              InkWell(
-                                onTap: () => _toggle(idx.ticker),
-                                borderRadius: BorderRadius.vertical(
-                                  top: i == 0 ? const Radius.circular(12) : Radius.zero,
-                                  bottom: i == indices.length - 1
-                                      ? const Radius.circular(12)
-                                      : Radius.zero,
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  child: Row(
-                                    children: [
-                                      // Farebný indikátor
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: idx.color,
-                                          shape: BoxShape.circle,
+                      // Indexy v regióne
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)
+                          ],
+                        ),
+                        child: Column(
+                          children: indices.asMap().entries.map((entry) {
+                            final i = entry.key;
+                            final idx = entry.value;
+                            final isSelected = _selected.contains(idx.ticker);
+                            return Column(
+                              children: [
+                                InkWell(
+                                  onTap: () => _toggle(idx.ticker),
+                                  borderRadius: BorderRadius.vertical(
+                                    top: i == 0 ? const Radius.circular(12) : Radius.zero,
+                                    bottom: i == indices.length - 1
+                                        ? const Radius.circular(12)
+                                        : Radius.zero,
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        // Farebný indikátor
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: idx.color,
+                                            shape: BoxShape.circle,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Názov a ticker
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(idx.name,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: isSelected
-                                                      ? FontWeight.w600
-                                                      : FontWeight.normal,
-                                                )),
-                                            Text(idx.desc,
-                                                style: TextStyle(
-                                                    fontSize: 11, color: Colors.grey[500])),
-                                          ],
+                                        const SizedBox(width: 12),
+                                        // Názov a ticker
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(idx.name,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: isSelected
+                                                        ? FontWeight.w600
+                                                        : FontWeight.normal,
+                                                  )),
+                                              Text(idx.desc,
+                                                  style: TextStyle(
+                                                      fontSize: 11, color: Colors.grey[500])),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      // Checkbox
-                                      Checkbox(
-                                        value: isSelected,
-                                        onChanged: (_) => _toggle(idx.ticker),
-                                        activeColor: const Color(0xFF1565C0),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(4)),
-                                      ),
-                                    ],
+                                        // Checkbox
+                                        Checkbox(
+                                          value: isSelected,
+                                          onChanged: (_) => _toggle(idx.ticker),
+                                          activeColor: const Color(0xFF1565C0),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(4)),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (i < indices.length - 1)
-                                Divider(height: 1, indent: 38, color: Colors.grey[100]),
-                            ],
-                          );
-                        }).toList(),
+                                if (i < indices.length - 1)
+                                  Divider(height: 1, indent: 38, color: Colors.grey[100]),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                );
-              }).toList()
-                ..add(const SizedBox(height: 20)),
+                      const SizedBox(height: 4),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 20),
+              ],
             ),
           ),
         ],
