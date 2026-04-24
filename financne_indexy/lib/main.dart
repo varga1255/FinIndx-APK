@@ -26,19 +26,28 @@ class FinancialIndex {
   });
 }
 
+class SettingsResult {
+  final Set<String> selectedTickers;
+  final List<FinancialIndex> customIndices;
+
+  const SettingsResult({
+    required this.selectedTickers,
+    required this.customIndices,
+  });
+}
+
 class DayData {
   final DateTime date;
   final double close;
   DayData({required this.date, required this.close});
 }
 
-// ---- VŠETKY INDEXY (20) ----
+// ---- VŠETKY INDEXY ----
 
 const List<FinancialIndex> kAllIndices = [
   // USA
   FinancialIndex(name: 'S&P 500',            ticker: '^GSPC',     color: Color(0xFF2E7D32), region: 'USA',            desc: '500 najväčších amerických spoločností'),
   FinancialIndex(name: 'NASDAQ Composite',   ticker: '^IXIC',     color: Color(0xFFE65100), region: 'USA',            desc: 'Všetky akcie burzy NASDAQ, dôraz na technológie'),
-  FinancialIndex(name: 'NASDAQ 100',         ticker: '^NDX',      color: Color(0xFFF57F17), region: 'USA',            desc: '100 najväčších nefinančných firiem na NASDAQ'),
   FinancialIndex(name: 'Dow Jones',          ticker: '^DJI',      color: Color(0xFF1565C0), region: 'USA',            desc: '30 blue-chip amerických priemyselných spoločností'),
   FinancialIndex(name: 'Russell 2000',       ticker: '^RUT',      color: Color(0xFF0288D1), region: 'USA',            desc: '2000 malých amerických spoločností'),
   // Svet
@@ -46,25 +55,16 @@ const List<FinancialIndex> kAllIndices = [
   // Európa
   FinancialIndex(name: 'Euro Stoxx 50',      ticker: '^STOXX50E', color: Color(0xFFC62828), region: 'Európa',         desc: '50 blue-chip spoločností z eurozóny'),
   FinancialIndex(name: 'STOXX Europe 600',   ticker: '^STOXX',    color: Color(0xFFAD1457), region: 'Európa',         desc: '600 európskych spoločností zo 17 krajín'),
-  FinancialIndex(name: 'FTSE 100',           ticker: '^FTSE',     color: Color(0xFF00695C), region: 'Európa',         desc: '100 najväčších britských spoločností'),
   FinancialIndex(name: 'DAX',                ticker: '^GDAXI',    color: Color(0xFF558B2F), region: 'Európa',         desc: '40 najväčších nemeckých spoločností'),
-  FinancialIndex(name: 'CAC 40',             ticker: '^FCHI',     color: Color(0xFF4527A0), region: 'Európa',         desc: '40 najväčších francúzskych spoločností'),
-  FinancialIndex(name: 'IBEX 35',            ticker: '^IBEX',     color: Color(0xFF880E4F), region: 'Európa',         desc: '35 najväčších španielskych spoločností'),
-  FinancialIndex(name: 'AEX',                ticker: '^AEX',      color: Color(0xFF33691E), region: 'Európa',         desc: '25 najväčších holandských spoločností'),
-  FinancialIndex(name: 'BEL 20',             ticker: '^BFX',      color: Color(0xFF1A237E), region: 'Európa',         desc: '20 najväčších belgických spoločností'),
-  FinancialIndex(name: 'WIG20',              ticker: 'WIG20.WA',  color: Color(0xFF37474F), region: 'Európa',         desc: '20 najväčších poľských spoločností'),
-  // Ázia & Pacifik
-  FinancialIndex(name: 'Nikkei 225',         ticker: '^N225',     color: Color(0xFFE53935), region: 'Ázia & Pacifik', desc: '225 blue-chip japonských spoločností'),
-  FinancialIndex(name: 'Hang Seng',          ticker: '^HSI',      color: Color(0xFFD84315), region: 'Ázia & Pacifik', desc: 'Hlavné spoločnosti hongkonskej burzy'),
-  FinancialIndex(name: 'Shanghai Composite', ticker: '000001.SS', color: Color(0xFF827717), region: 'Ázia & Pacifik', desc: 'Všetky akcie šanghajskej burzy'),
-  FinancialIndex(name: 'ASX 200',            ticker: '^AXJO',     color: Color(0xFF00838F), region: 'Ázia & Pacifik', desc: '200 najväčších austrálskych spoločností'),
   // Volatilita
   FinancialIndex(name: 'VIX',                ticker: '^VIX',      color: Color(0xFFBF360C), region: 'Volatilita',     desc: 'Index volatility trhu (Fear Index)'),
 ];
 
 // Predvolený výber pri prvom spustení
-const Set<String> kDefaultTickers = {'^GSPC', '^IXIC', 'URTH', '^STOXX50E', '^STOXX', 'WIG20.WA'};
+const Set<String> kDefaultTickers = {'^GSPC', '^IXIC', 'URTH', '^STOXX50E', '^STOXX'};
 const String kPrefKey = 'selectedTickers';
+const String kCustomIndicesPrefKey = 'customIndices';
+const int kCustomIndexSlots = 10;
 
 // ---- STIAHNUTIE DÁT ----
 
@@ -126,6 +126,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Set<String> _selectedTickers = kDefaultTickers;
+  List<FinancialIndex> _customIndices = const [];
   Future<Map<String, List<DayData>>>? _allDataFuture;
   DateTime? _dataDate;
 
@@ -138,18 +139,57 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(kPrefKey);
+    final customJson = prefs.getString(kCustomIndicesPrefKey);
+    final customIndices = _decodeCustomIndices(customJson);
     if (saved != null && saved.isNotEmpty) {
-      setState(() => _selectedTickers = saved.toSet());
+      setState(() {
+        _selectedTickers = saved.toSet();
+        _customIndices = customIndices;
+      });
+    } else {
+      setState(() => _customIndices = customIndices);
     }
   }
 
   Future<void> _savePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(kPrefKey, _selectedTickers.toList());
+    await prefs.setString(kCustomIndicesPrefKey, _encodeCustomIndices(_customIndices));
   }
 
+  List<FinancialIndex> _decodeCustomIndices(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded.whereType<Map>().map((item) {
+        return FinancialIndex(
+          name: (item['name'] ?? '').toString(),
+          ticker: (item['ticker'] ?? '').toString(),
+          color: Color((item['color'] as num?)?.toInt() ?? 0xFF607D8B),
+          region: 'Vlastné',
+          desc: (item['desc'] ?? '').toString(),
+        );
+      }).where((idx) => idx.name.trim().isNotEmpty && idx.ticker.trim().isNotEmpty).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String _encodeCustomIndices(List<FinancialIndex> indices) {
+    final encoded = indices.map((idx) => {
+      'name': idx.name,
+      'ticker': idx.ticker,
+      'desc': idx.desc,
+      'color': idx.color.value,
+    }).toList();
+    return jsonEncode(encoded);
+  }
+
+  List<FinancialIndex> get _allIndices => [...kAllIndices, ..._customIndices];
+
   List<FinancialIndex> get _activeIndices =>
-      kAllIndices.where((i) => _selectedTickers.contains(i.ticker)).toList();
+      _allIndices.where((i) => _selectedTickers.contains(i.ticker)).toList();
 
   Future<Map<String, List<DayData>>> _fetchAll() async {
     final entries = await Future.wait(
@@ -172,15 +212,23 @@ class _HomeScreenState extends State<HomeScreen> {
   void _load() => setState(() => _allDataFuture = _fetchAll());
 
   Future<void> _openSettings() async {
-    final result = await Navigator.push<Set<String>>(
+    final result = await Navigator.push<SettingsResult>(
       context,
       MaterialPageRoute(
-        builder: (_) => SettingsScreen(selectedTickers: Set.from(_selectedTickers)),
+        builder: (_) => SettingsScreen(
+          selectedTickers: Set.from(_selectedTickers),
+          customIndices: List.from(_customIndices),
+        ),
       ),
     );
-    if (result != null && result != _selectedTickers) {
+    if (result != null) {
       setState(() {
-        _selectedTickers = result;
+        _customIndices = result.customIndices;
+        final availableTickers = _allIndices.map((idx) => idx.ticker).toSet();
+        _selectedTickers = result.selectedTickers.intersection(availableTickers);
+        if (_selectedTickers.isEmpty && kAllIndices.isNotEmpty) {
+          _selectedTickers = {kAllIndices.first.ticker};
+        }
         _allDataFuture = null; // reset — user musí znovu načítať
       });
       await _savePrefs();
@@ -317,19 +365,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class SettingsScreen extends StatefulWidget {
   final Set<String> selectedTickers;
-  const SettingsScreen({super.key, required this.selectedTickers});
+  final List<FinancialIndex> customIndices;
+  const SettingsScreen({
+    super.key,
+    required this.selectedTickers,
+    required this.customIndices,
+  });
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late Set<String> _selected;
+  late List<FinancialIndex?> _customSlots;
 
   @override
   void initState() {
     super.initState();
     _selected = Set.from(widget.selectedTickers);
+    _customSlots = List<FinancialIndex?>.filled(kCustomIndexSlots, null);
+    for (int i = 0; i < widget.customIndices.length && i < kCustomIndexSlots; i++) {
+      _customSlots[i] = widget.customIndices[i];
+    }
   }
+
+  List<FinancialIndex> get _customIndices =>
+      _customSlots.whereType<FinancialIndex>().toList();
+
+  List<FinancialIndex> get _allIndices => [...kAllIndices, ..._customIndices];
 
   void _toggle(String ticker) {
     setState(() {
@@ -341,10 +404,223 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<void> _editCustomSlot(int slotIndex) async {
+    final current = _customSlots[slotIndex];
+    final nameController = TextEditingController(text: current?.name ?? '');
+    final tickerController = TextEditingController(text: current?.ticker ?? '');
+    final descController = TextEditingController(text: current?.desc ?? '');
+
+    final result = await showDialog<Object?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Vlastný index ${slotIndex + 1}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Názov'),
+              ),
+              TextField(
+                controller: tickerController,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Yahoo ticker'),
+              ),
+              TextField(
+                controller: descController,
+                minLines: 2,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Popis'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (current != null)
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'delete'),
+              child: const Text('Vymazať'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Zrušiť'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final ticker = tickerController.text.trim();
+              final desc = descController.text.trim();
+              if (name.isEmpty || ticker.isEmpty) return;
+              Navigator.pop(
+                context,
+                FinancialIndex(
+                  name: name,
+                  ticker: ticker,
+                  color: Color(0xFF607D8B + (slotIndex * 0x000A0A0A)),
+                  region: 'Vlastné',
+                  desc: desc.isEmpty ? 'Vlastný sledovaný index' : desc,
+                ),
+              );
+            },
+            child: const Text('Uložiť'),
+          ),
+        ],
+      ),
+    );
+
+    nameController.dispose();
+    tickerController.dispose();
+    descController.dispose();
+
+    if (!mounted) return;
+    if (result == null) return;
+    setState(() {
+      final oldTicker = current?.ticker;
+      if (result == 'delete') {
+        if (oldTicker != null) _selected.remove(oldTicker);
+        _customSlots[slotIndex] = null;
+      } else {
+        final updated = result as FinancialIndex;
+        if (oldTicker != null && oldTicker != updated.ticker) {
+          _selected.remove(oldTicker);
+        }
+        _customSlots[slotIndex] = updated;
+        _selected.add(updated.ticker);
+      }
+    });
+  }
+
+  Widget _buildIndexTile(FinancialIndex idx, int i, int count) {
+    final isSelected = _selected.contains(idx.ticker);
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => _toggle(idx.ticker),
+          borderRadius: BorderRadius.vertical(
+            top: i == 0 ? const Radius.circular(12) : Radius.zero,
+            bottom: i == count - 1 ? const Radius.circular(12) : Radius.zero,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: idx.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(idx.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          )),
+                      Text(idx.desc,
+                          style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                    ],
+                  ),
+                ),
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => _toggle(idx.ticker),
+                  activeColor: const Color(0xFF1565C0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (i < count - 1)
+          Divider(height: 1, indent: 38, color: Colors.grey[100]),
+      ],
+    );
+  }
+
+  Widget _buildCustomSlotTile(int slotIndex) {
+    final idx = _customSlots[slotIndex];
+    if (idx != null) {
+      final isSelected = _selected.contains(idx.ticker);
+      return Column(
+        children: [
+          InkWell(
+            onTap: () => _toggle(idx.ticker),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(color: idx.color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(idx.name, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                        Text('${idx.ticker} · ${idx.desc}', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _editCustomSlot(slotIndex),
+                    tooltip: 'Upraviť',
+                  ),
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggle(idx.ticker),
+                    activeColor: const Color(0xFF1565C0),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Divider(height: 1, indent: 38, color: Colors.grey[100]),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => _editCustomSlot(slotIndex),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 20, color: Colors.grey[500]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Pridať vlastný index ${slotIndex + 1}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.grey[400]),
+              ],
+            ),
+          ),
+        ),
+        Divider(height: 1, indent: 38, color: Colors.grey[100]),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Zoskup podľa regiónu v poradí
-    final regionOrder = ['USA', 'Svet', 'Európa', 'Ázia & Pacifik', 'Volatilita'];
+    final regionOrder = ['USA', 'Svet', 'Európa', 'Volatilita'];
     final grouped = <String, List<FinancialIndex>>{};
     for (final r in regionOrder) {
       grouped[r] = kAllIndices.where((i) => i.region == r).toList();
@@ -359,7 +635,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, _selected),
+            onPressed: () {
+              final customTickers = _customIndices.map((idx) => idx.ticker).toSet();
+              final fixedTickers = kAllIndices.map((idx) => idx.ticker).toSet();
+              final allowedTickers = fixedTickers.union(customTickers);
+              Navigator.pop(
+                context,
+                SettingsResult(
+                  selectedTickers: _selected.intersection(allowedTickers),
+                  customIndices: _customIndices,
+                ),
+              );
+            },
             child: const Text('Uložiť',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
           ),
@@ -373,7 +660,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: const Color(0xFF1565C0).withOpacity(0.08),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Text(
-              'Vybrané: ${_selected.length} / ${kAllIndices.length} indexov',
+              'Vybrané: ${_selected.length} / ${_allIndices.length} indexov',
               style: TextStyle(fontSize: 13, color: Colors.grey[700]),
             ),
           ),
@@ -410,75 +697,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                         child: Column(
-                          children: indices.asMap().entries.map((entry) {
-                            final i = entry.key;
-                            final idx = entry.value;
-                            final isSelected = _selected.contains(idx.ticker);
-                            return Column(
-                              children: [
-                                InkWell(
-                                  onTap: () => _toggle(idx.ticker),
-                                  borderRadius: BorderRadius.vertical(
-                                    top: i == 0 ? const Radius.circular(12) : Radius.zero,
-                                    bottom: i == indices.length - 1
-                                        ? const Radius.circular(12)
-                                        : Radius.zero,
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    child: Row(
-                                      children: [
-                                        // Farebný indikátor
-                                        Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: idx.color,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        // Názov a ticker
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(idx.name,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: isSelected
-                                                        ? FontWeight.w600
-                                                        : FontWeight.normal,
-                                                  )),
-                                              Text(idx.desc,
-                                                  style: TextStyle(
-                                                      fontSize: 11, color: Colors.grey[500])),
-                                            ],
-                                          ),
-                                        ),
-                                        // Checkbox
-                                        Checkbox(
-                                          value: isSelected,
-                                          onChanged: (_) => _toggle(idx.ticker),
-                                          activeColor: const Color(0xFF1565C0),
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (i < indices.length - 1)
-                                  Divider(height: 1, indent: 38, color: Colors.grey[100]),
-                              ],
-                            );
-                          }).toList(),
+                          children: indices.asMap().entries
+                              .map((entry) => _buildIndexTile(entry.value, entry.key, indices.length))
+                              .toList(),
                         ),
                       ),
                       const SizedBox(height: 4),
                     ],
                   );
                 }),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  child: const Text(
+                    'Vlastné',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1565C0),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)
+                    ],
+                  ),
+                  child: Column(
+                    children: List.generate(kCustomIndexSlots, _buildCustomSlotTile),
+                  ),
+                ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -848,8 +1101,6 @@ class _CombinedChartViewState extends State<CombinedChartView> {
             final rsiVals = _rsiForPeriod(rsiIdx.ticker);
             if (rsiVals.isEmpty) return const SizedBox.shrink();
             final bars = <LineChartBarData>[
-              LineChartBarData(spots: List.generate(n, (i) => FlSpot(i.toDouble(), 70)), color: Colors.red.withOpacity(0.3), barWidth: 1.2, dotData: FlDotData(show: false), dashArray: [4, 4]),
-              LineChartBarData(spots: List.generate(n, (i) => FlSpot(i.toDouble(), 30)), color: Colors.green.withOpacity(0.3), barWidth: 1.2, dotData: FlDotData(show: false), dashArray: [4, 4]),
               LineChartBarData(
                 spots: rsiVals.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
                 isCurved: true, curveSmoothness: 0.3, color: rsiIdx.color, barWidth: 0.6,
@@ -857,7 +1108,6 @@ class _CombinedChartViewState extends State<CombinedChartView> {
                 belowBarData: BarAreaData(show: false),
               ),
             ];
-            final activeRsi = [rsiIdx];
             return Card(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -892,13 +1142,15 @@ class _CombinedChartViewState extends State<CombinedChartView> {
                           getDrawingHorizontalLine: (v) => FlLine(color: (v == 30 || v == 70) ? Colors.grey.withOpacity(0.4) : Colors.grey.withOpacity(0.1), strokeWidth: (v == 30 || v == 70) ? 1.2 : 1, dashArray: (v == 30 || v == 70) ? [4, 4] : null),
                           getDrawingVerticalLine: (_) => FlLine(color: Colors.grey.withOpacity(0.1), strokeWidth: 1),
                         ),
+                        extraLinesData: ExtraLinesData(horizontalLines: [
+                          HorizontalLine(y: 70, color: Colors.red.withOpacity(0.3), strokeWidth: 1.2, dashArray: [4, 4]),
+                          HorizontalLine(y: 30, color: Colors.green.withOpacity(0.3), strokeWidth: 1.2, dashArray: [4, 4]),
+                        ]),
                         borderData: FlBorderData(show: true, border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.3)), left: BorderSide(color: Colors.grey.withOpacity(0.3)))),
                         lineTouchData: LineTouchData(touchTooltipData: LineTouchTooltipData(
                           getTooltipColor: (_) => Colors.white,
                           getTooltipItems: (spots) => spots.map((s) {
-                            if (s.barIndex < 2) return null;
-                            final idx = activeRsi[s.barIndex - 2];
-                            return LineTooltipItem('${idx.name}: RSI ${s.y.toStringAsFixed(1)}', TextStyle(color: idx.color, fontSize: 10, fontWeight: FontWeight.w600));
+                            return LineTooltipItem('${rsiIdx.name}: RSI ${s.y.toStringAsFixed(1)}', TextStyle(color: rsiIdx.color, fontSize: 10, fontWeight: FontWeight.w600));
                           }).toList(),
                         )),
                       )),
